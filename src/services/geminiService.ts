@@ -8,9 +8,20 @@ export async function explainVerse(query: string) {
       body: JSON.stringify({ query }),
     });
 
+    const contentType = response.headers.get("content-type");
     if (!response.ok) {
-      const errorData = await response.json();
-      throw new Error(errorData.error || "Failed to fetch explanation.");
+      if (contentType && contentType.includes("application/json")) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || `Server error: ${response.status}`);
+      } else {
+        const text = await response.text();
+        throw new Error(`Server returned ${response.status}: ${text.slice(0, 100)}...`);
+      }
+    }
+
+    if (!contentType || !contentType.includes("application/json")) {
+      const text = await response.text();
+      throw new Error(`Expected JSON but got ${contentType}: ${text.slice(0, 100)}...`);
     }
 
     const data = await response.json();
