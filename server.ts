@@ -1,5 +1,4 @@
 import express from "express";
-import { createServer as createViteServer } from "vite";
 import OpenAI from "openai";
 import dotenv from "dotenv";
 import path from "path";
@@ -21,7 +20,7 @@ function getOpenRouterClient() {
   if (!openRouterClient) {
     const apiKey = process.env.OPENROUTER_API_KEY;
     if (!apiKey || apiKey.trim() === "") {
-      throw new Error("OPENROUTER_API_KEY is missing. Please add your OpenRouter API key in the Secrets panel.");
+      throw new Error("OPENROUTER_API_KEY is missing. Please add your OpenRouter API key in Vercel Environment Variables.");
     }
     openRouterClient = new OpenAI({
       apiKey: apiKey,
@@ -38,10 +37,14 @@ function getOpenRouterClient() {
 app.post("/api/explain", async (req, res) => {
   const { query } = req.body;
 
+  if (!query) {
+    return res.status(400).json({ error: "Query is required" });
+  }
+
   try {
     const client = getOpenRouterClient();
     const response = await client.chat.completions.create({
-      model: "deepseek/deepseek-r1", // Using DeepSeek R1 via OpenRouter
+      model: "deepseek/deepseek-r1",
       messages: [
         {
           role: "system",
@@ -62,13 +65,16 @@ app.post("/api/explain", async (req, res) => {
     res.json({ text: response.choices[0].message.content });
   } catch (error: any) {
     console.error("OpenRouter API Error:", error);
-    const status = error.message?.includes("OPENROUTER_API_KEY is missing") ? 401 : 500;
-    res.status(status).json({ error: error.message || "Failed to fetch explanation from OpenRouter." });
+    res.status(500).json({ 
+      error: error.message || "Failed to fetch explanation from OpenRouter.",
+      details: process.env.NODE_ENV === 'development' ? error.stack : undefined
+    });
   }
 });
 
 async function startServer() {
   if (process.env.NODE_ENV !== "production") {
+    const { createServer: createViteServer } = await import("vite");
     const vite = await createViteServer({
       server: { middlewareMode: true },
       appType: "spa",
@@ -81,14 +87,13 @@ async function startServer() {
     });
   }
 
-  app.listen(PORT, "0.0.0.0", () => {
-    console.log(`Server running on http://localhost:${PORT}`);
-  });
+  if (!process.env.VERCEL) {
+    app.listen(PORT, "0.0.0.0", () => {
+      console.log(`Server running on http://localhost:${PORT}`);
+    });
+  }
 }
 
-// Export for Vercel
+startServer();
+
 export default app;
-
-if (process.env.NODE_ENV !== "production" || !process.env.VERCEL) {
-  startServer();
-}
