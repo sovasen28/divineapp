@@ -1,0 +1,5 @@
+{
+  "name": "Bible Scholar AI",
+  "description": "An AI-powered Bible explanation and theological insight tool using Gemini.",
+  "requestFramePermissions": []
+}
